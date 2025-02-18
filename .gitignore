@@ -4,3 +4,7 @@ __pycache__
 .env
 users_content
 *.db
+.gigaide
+.idea
+*cache*
+.vscode

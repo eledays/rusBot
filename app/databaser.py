@@ -35,11 +35,17 @@ class Databaser:
         self.conn.commit()
         return self.cursor.lastrowid
 
-    def get_all_topics(self):
+    def get_topics(self):
         self.cursor.execute('''
             SELECT * FROM topics
         ''')
         return self.cursor.fetchall()
+    
+    def get_topic(self, topic_id):
+        self.cursor.execute('''
+            SELECT * FROM topics WHERE id = ?
+        ''', (topic_id,))
+        return self.cursor.fetchone()
     
     def get_topic_name_by_id(self, id):
         self.cursor.execute('''
@@ -61,7 +67,14 @@ class Databaser:
         self.conn.commit()
         return self.cursor.lastrowid
     
-    def get_pieces_by_topic(self, topic_id):
+    def add_pieces(self, topic_id, pieces):
+        self.cursor.executemany('''
+            INSERT INTO pieces (topic_id, data)
+            VALUES (?, ?)
+        ''', [(topic_id, e) for e in pieces])
+        self.conn.commit()
+    
+    def get_pieces(self, topic_id):
         self.cursor.execute('''
             SELECT * FROM pieces WHERE topic_id = ?
         ''', (topic_id,))

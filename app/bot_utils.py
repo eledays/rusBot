@@ -13,8 +13,11 @@ def send_long_message(bot, *args, **kwargs):
         text = kwargs['text']
         kwargs.pop('text')
 
+    last_msg = None
     if len(text) > 4096:
         for x in range(0, len(text), 4096):
-            bot.send_message(chat_id, text[x:x+4096], *args, **kwargs)
+            last_msg = bot.send_message(chat_id, text[x:x+4096], *args, **kwargs)
     else:
-        bot.send_message(chat_id, text, *args, **kwargs)
+        return bot.send_message(chat_id, text, *args, **kwargs)
+    
+    return last_msg

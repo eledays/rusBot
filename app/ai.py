@@ -5,6 +5,7 @@ import requests
 import json
 import urllib3
 import time
+import os
 
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -15,51 +16,27 @@ class AI:
     def __init__(self):
         self.refresh_access_token()
         self.messages = []
+        self.cache_file = 'ai_cache.json'
+        self.cache = self.load_cache()
+
+    def load_cache(self):
+        if os.path.exists(self.cache_file):
+            with open(self.cache_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        return {}
+
+    def save_cache(self):
+        with open(self.cache_file, 'w', encoding='utf-8') as f:
+            json.dump(self.cache, f, ensure_ascii=False, indent=4)
 
     def refresh_access_token(self):
         self.ACCESS_TOKEN, self.TOKEN_EXPIRES_AT = get_access_token()
 
     def ask(self, text: str, use_history: bool = False):
-        if text == 'Напиши всю теорию по теме "/ai". Не обращайся к пользователю, пиши только то, что относится к теме, не используй вводный текст. Не используй markdown':
-            return '''Правописание суффиксов "пре-/при-"
-
-Суффиксы "пре-" и "при-" являются приставками, которые могут иметь как схожие, так и различные значения.
-
-1. Приставка "пре-"
-
-   - Имеет значение "очень", "превосходящий", "сверх-".
-   - Примеры: превысить, преодолеть, превратить.
-   - Обычно используется с глаголами и прилагательными, когда речь идет о чем-то, что значительно превосходит норму.
-
-2. Приставка "при-"
-
-   - Имеет множество значений, которые можно разделить на несколько групп:
-     - Приближение, присоединение: приехать, пристроить.
-     - Приближение по действию: приоткрыть, присмотреться.
-     - Сближение, расположение: привокзальный, пришкольный.
-     - Неполное действие, соучастие: приоткрыть, прислушаться.
-     - Направление действия внутрь: приделать, пришить.
-     - Совместное действие: приобщить, приготовить.
-
-3. Сложные случаи
-
-   - Если слово имеет значение, близкое к "очень", "сверх-", то используется "пре-": превысить, превратить.
-   - Если слово имеет значение "близко", "приближенно", то также используется "пре-": превратить, превращать.
-   - Если слово имеет значение "приближение", "присоединение", то используется "при-": приехать, приходить.
-
-4. Особенности
-
-   - В некоторых случаях выбор между "пре-" и "при-" может зависеть от конкретного значения слова, но в большинстве случаев можно руководствоваться общими правилами.
-   - Слово "примитивный" имеет значение "самый простой", поэтому используется "при-".
-
-5. Исключения
-
-   - Есть слова, в которых выбор между "пре-" и "при-" является исключением:
-     - Привыкнуть, приспособиться — используются "при-".
-     - Преувеличить, превысить — используются "пре-".
-
-Таким образом, выбор между "пре-" и "при-" зависит от значения слова и контекста его использования.'''
-
+        if text in self.cache:
+            print('cache used')
+            return self.cache[text]
+        
         if self.TOKEN_EXPIRES_AT < time.time():
             self.refresh_access_token()
 
@@ -80,14 +57,17 @@ class AI:
                 'content': text
             }], self.ACCESS_TOKEN)
 
+        self.cache[text] = answer
+        self.save_cache()
+
         return answer
     
     def text_to_pieces(self, text: str):
         prompt = f'{text}\n\n\nРазбей теорию, описанную в тексте на маленькие независимые порции информации (максимум несколько предложений). Не обращайся к пользователю, пиши только то, что относится к теме, не используй вводный текст. Не используй markdown. Между блоками должно быть две пустые строки. Ты должен использовать всю информацию'
         answer = self.ask(prompt)
-        print(answer)
+        # print(answer)
         pieces = parse_pieces(answer)
-        print(pieces)
+        # print(pieces)
         return pieces
 
 
@@ -126,6 +106,7 @@ def get_response(messages: list[dict], access_token) -> str:
     }
 
     response = requests.request("POST", url, headers=headers, data=payload, verify=False)
+    print(response)
 
     return response.json()['choices'][0]['message']['content']
 
