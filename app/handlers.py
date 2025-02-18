@@ -27,7 +27,7 @@ def send_help(message):
 def create(message, step=0, data={}):
     if message.text == '/cancel':
         if data and 'id' in data:
-            db.delete(data['id'])
+            db.delete_topic(data['id'])
             shutil.rmtree(f'{basedir}/users_content/{data["id"]}')
         bot.send_message(message.chat.id, 'Отменено')
         return
@@ -38,7 +38,7 @@ def create(message, step=0, data={}):
 
     elif step == 1:
         name = message.text
-        topic_id = db.add(name, message.from_user.id)
+        topic_id = db.add_topic(name, message.from_user.id)
     
         os.mkdir(f'{basedir}/users_content/{topic_id}')
 
@@ -54,7 +54,14 @@ def create(message, step=0, data={}):
             
             create(message, 'ai-gen-text', data)
         elif message.text == '/next':
-            ...
+            bot.send_message(message.chat.id, 'Отлично. Сейчас нейросеть разобьет теорию на маленькие порции информации')
+            with open(f'{basedir}/users_content/{data["id"]}/theory.txt', 'r') as file:
+                text = file.read()
+            pieces = ai.text_to_pieces(text)
+
+            text = '\n\n'.join(f'<blockquote>{e}</blockquote>' for e in pieces)
+
+            bot.send_message(message.chat.id, text)
         else:
             text = message.text
             with open(f'{basedir}/users_content/{data["id"]}/theory.txt', 'a') as file:
@@ -88,7 +95,7 @@ def send_topics(message):
 def callback_inline(call):
     if call.data.startswith('yes'):
         topic_id = call.data.split('_')[1]
-        name = db.get_name_by_id(topic_id)
+        name = db.get_topic_name_by_id(topic_id)
         text = call.message.text
         with open(f'{basedir}/users_content/{topic_id}/theory.txt', 'a') as file:
             file.write(text + '\n')
@@ -97,12 +104,12 @@ def callback_inline(call):
         bot.register_next_step_handler(message, create, 2, {'id': topic_id, 'name': name})
     elif call.data.startswith('no'):
         topic_id = call.data.split('_')[1]
-        name = db.get_name_by_id(topic_id)
+        name = db.get_topic_name_by_id(topic_id)
         message = bot.send_message(call.message.chat.id, 'Не записываю. Отправь свой текст')
         bot.edit_message_reply_markup(call.message.chat.id, call.message.id, reply_markup=None)
         bot.register_next_step_handler(message, create, 2, {'id': topic_id, 'name': name})
     elif call.data.startswith('refresh'):
         bot.delete_message(call.message.chat.id, call.message.id)
         topic_id = call.data.split('_')[1]
-        name = db.get_name_by_id(topic_id)
+        name = db.get_topic_name_by_id(topic_id)
         create(call.message, 'ai-gen-text', {'id': topic_id, 'name': name})

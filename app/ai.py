@@ -81,7 +81,15 @@ class AI:
             }], self.ACCESS_TOKEN)
 
         return answer
-        
+    
+    def text_to_pieces(self, text: str):
+        prompt = f'{text}\n\n\nРазбей теорию, описанную в тексте на маленькие независимые порции информации (максимум несколько предложений). Не обращайся к пользователю, пиши только то, что относится к теме, не используй вводный текст. Не используй markdown. Между блоками должно быть две пустые строки. Ты должен использовать всю информацию'
+        answer = self.ask(prompt)
+        print(answer)
+        pieces = parse_pieces(answer)
+        print(pieces)
+        return pieces
+
 
 def get_access_token():
     url = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
@@ -120,3 +128,10 @@ def get_response(messages: list[dict], access_token) -> str:
     response = requests.request("POST", url, headers=headers, data=payload, verify=False)
 
     return response.json()['choices'][0]['message']['content']
+
+
+def parse_pieces(text: str):
+    pieces = text.split('\n\n')
+    pieces = [piece.strip() for piece in pieces]
+    pieces = [piece for piece in pieces if piece]
+    return pieces

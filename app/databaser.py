@@ -18,8 +18,16 @@ class Databaser:
                 admin_verified BOOLEAN DEFAULT FALSE
             )
         ''')
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS pieces (
+                id INTEGER PRIMARY KEY,
+                topic_id INTEGER NOT NULL,
+                data TEXT NOT NULL
+            )
+        ''')
+        self.conn.commit()
 
-    def add(self, name, author_id, human_verified=False, admin_verified=False):
+    def add_topic(self, name, author_id, human_verified=False, admin_verified=False):
         self.cursor.execute('''
             INSERT INTO topics (name, author_id, human_verified, admin_verified)
             VALUES (?, ?, ?, ?)
@@ -27,23 +35,39 @@ class Databaser:
         self.conn.commit()
         return self.cursor.lastrowid
 
-    def get_all(self):
+    def get_all_topics(self):
         self.cursor.execute('''
             SELECT * FROM topics
         ''')
         return self.cursor.fetchall()
     
-    def get_name_by_id(self, id):
+    def get_topic_name_by_id(self, id):
         self.cursor.execute('''
             SELECT name FROM topics WHERE id = ?
         ''', (id,))
         return self.cursor.fetchone()['name']
     
-    def delete(self, id):
+    def delete_topic(self, id):
         self.cursor.execute('''
             DELETE FROM topics WHERE id = ?
         ''', (id,))
         self.conn.commit()
-        
+    
+    def add_piece(self, topic_id, data):
+        self.cursor.execute('''
+            INSERT INTO pieces (topic_id, data)
+            VALUES (?, ?)
+        ''', (topic_id, data))
+        self.conn.commit()
+        return self.cursor.lastrowid
+    
+    def get_pieces_by_topic(self, topic_id):
+        self.cursor.execute('''
+            SELECT * FROM pieces WHERE topic_id = ?
+        ''', (topic_id,))
+        return self.cursor.fetchall()
+
+    def __del__(self):
+        self.conn.close()
         
         
