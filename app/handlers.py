@@ -125,6 +125,10 @@ def edit_topic(message, step=0, data={}):
             bot.send_message(message.chat.id, 'Такой темы не существует')
             return
         
+        if topic['author_id'] != message.from_user.id:
+            bot.send_message(message.chat.id, 'Вы не можете редактировать эту тему')
+            return
+        
         pieces = db.get_pieces(topic_id)
         data['topic_id'] = topic_id
         data['pieces'] = [e['data'] for e in pieces]
