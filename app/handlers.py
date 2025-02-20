@@ -1,5 +1,5 @@
 from app import bot, db, basedir, ai
-from app.bot_utils import send_long_message
+from app.bot_utils import send_long_message, send_pieces
 
 import telebot
 
@@ -203,6 +203,21 @@ def send_topics(message):
     topics = db.get_topics()[:50]
     topics = [f'{e["id"] + 1}. {e["name"]}' for e in topics]
     bot.send_message(message.chat.id, '<b>Темы</b>\n' + '\n'.join(topics))
+
+
+@bot.message_handler(commands=['pieces'])
+def pieces_cmd(message):
+    topic_id = message.text.split()[1]
+    if not topic_id.isdigit():
+        bot.send_message(message.chat.id, 'Id должен быть числом')
+        return
+    
+    pieces = db.get_pieces(int(topic_id))
+    if not pieces:
+        bot.send_message(message.chat.id, 'По вашему запросу ничего не найдено')
+        return 
+    
+    send_pieces(bot, message.chat.id, pieces)
 
 
 @bot.callback_query_handler(func=lambda call: True)
