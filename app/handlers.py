@@ -258,3 +258,16 @@ def callback_inline(call):
         topic_id = call.data.split('_')[1]
         name = db.get_topic_name_by_id(topic_id)
         create_topic(call.message, 'ai-gen-text', {'topic_id': topic_id, 'name': name})
+
+    elif call.data.startswith('piece-reaction'):
+        _, color, piece_id = call.data.split('_')
+        piece_id = int(piece_id)
+
+        bot.edit_message_reply_markup(call.message.chat.id, call.message.id, reply_markup=None)
+
+        if color == 'green':
+            db.postpone_piece(piece_id, call.message.chat.id, 28)
+        elif color == 'yellow':
+            db.postpone_piece(piece_id, call.message.chat.id, 1)
+        elif color == 'red':
+            db.postpone_piece(piece_id, call.message.chat.id, 0)

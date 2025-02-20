@@ -81,6 +81,12 @@ class Databaser:
             VALUES (?, ?)
         ''', [(topic_id, e) for e in pieces])
         self.conn.commit()
+
+    def get_piece(self, piece_id):
+        self.cursor.execute('''
+            SELECT * FROM pieces WHERE id = ?
+        ''', (piece_id,))
+        return self.cursor.fetchone()
     
     def get_pieces(self, topic_id):
         self.cursor.execute('''
@@ -96,21 +102,28 @@ class Databaser:
 
         if scheduled:
             self.cursor.execute('''
-                DELETE FROM schedule WHERE id = ?
+                UPDATE schedule SET send_at = NULL WHERE id = ?
             ''', (scheduled['id'],))
             self.conn.commit()
-            return scheduled
+            piece_id = scheduled['piece_id']
+
+            return scheduled['user_id'], piece['data'], piece_id
         else:
             self.cursor.execute('''
                 SELECT * FROM schedule WHERE user_id = ? AND send_at IS NULL LIMIT 1
             ''', (user_id,))
-            piece = self.cursor.fetchone()
+            scheduled = self.cursor.fetchone()
+
+            piece_id = scheduled['piece_id']
+            piece = self.get_piece(piece_id)
             if piece:
-                self.cursor.execute('''
-                    DELETE FROM schedule WHERE id =?
-                ''', (piece['user_id'],))
-                self.conn.commit()
-                return piece
+                return scheduled['user_id'], piece['data'], piece_id
+            
+    def postpone_piece(self, piece_id, user_id, days):
+        self.cursor.execute(f'''
+            UPDATE schedule SET send_at = DATETIME('now', '+{days} day') WHERE piece_id = ? AND user_id = ?
+        ''', (piece_id, user_id))
+        self.conn.commit()
 
     def get_users(self):
         self.cursor.execute('''
