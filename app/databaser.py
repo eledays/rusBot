@@ -25,6 +25,14 @@ class Databaser:
                 data TEXT NOT NULL
             )
         ''')
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS schedule (
+                id INTEGER PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                piece_id INTEGER NOT NULL,
+                send_at DATETIME
+            )
+        ''')
         self.conn.commit()
 
     def add_topic(self, name, author_id, human_verified=False, admin_verified=False):
@@ -78,6 +86,36 @@ class Databaser:
         self.cursor.execute('''
             SELECT * FROM pieces WHERE topic_id = ?
         ''', (topic_id,))
+        return self.cursor.fetchall()
+    
+    def get_piece_to_send(self, user_id):
+        self.cursor.execute('''
+            SELECT * FROM schedule WHERE user_id = ? AND send_at <= DATETIME('now') ORDER BY send_at ASC LIMIT 1
+        ''', (user_id,))
+        scheduled = self.cursor.fetchone()
+
+        if scheduled:
+            self.cursor.execute('''
+                DELETE FROM schedule WHERE id = ?
+            ''', (scheduled['id'],))
+            self.conn.commit()
+            return scheduled
+        else:
+            self.cursor.execute('''
+                SELECT * FROM schedule WHERE user_id = ? AND send_at IS NULL LIMIT 1
+            ''', (user_id,))
+            piece = self.cursor.fetchone()
+            if piece:
+                self.cursor.execute('''
+                    DELETE FROM schedule WHERE id =?
+                ''', (piece['user_id'],))
+                self.conn.commit()
+                return piece
+
+    def get_users(self):
+        self.cursor.execute('''
+            SELECT DISTINCT user_id FROM schedule
+        ''')
         return self.cursor.fetchall()
 
     def __del__(self):

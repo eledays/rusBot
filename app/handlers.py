@@ -9,6 +9,7 @@ import shutil
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
+    print(message.chat.id)
     bot.send_message(message.chat.id, 'Привет\n\n'
                                       'Этот бот позволит тебе выучить любую тему\n\n<i>как это работает</i>\n\n'
                                       '<b>/create</b> — создать тему\n'
@@ -19,8 +20,12 @@ def send_welcome(message):
 @bot.message_handler(commands=['help'])
 def send_help(message):
     bot.send_message(message.chat.id, '<b>Основные команды</b>\n\n'
+                                      '<b>/study</b> — настройки обучения, выбор тем\n\n'
+                                      '<b>Темы:</b>\n'
                                       '<b>/create</b> — создать тему\n'
-                                      '<b>/topics</b> — список существующих тем')
+                                      '<b>/topics</b> — список существующих тем'
+                                      '<b>/edit</b> — редактировать тему\n'
+                                      '<b>/pieces n</b> — порции теории темы n\n')
     
 
 @bot.message_handler(commands=['create'])
@@ -222,6 +227,11 @@ def pieces_cmd(message):
         return 
     
     send_pieces(bot, message.chat.id, pieces)
+
+
+@bot.message_handler(commands=['study'])
+def study(message):
+    bot.send_message(message.chat.id, '')
 
 
 @bot.callback_query_handler(func=lambda call: True)
