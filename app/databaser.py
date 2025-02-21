@@ -37,7 +37,7 @@ class Databaser:
             CREATE TABLE IF NOT EXISTS statictics (
                 user_id INTEGER NOT NULL,
                 piece_id INTEGER NOT NULL,
-                color TEXT NOT NULL,
+                color TEXT NOT NULL
             )
         ''')
         self.conn.commit()
@@ -165,8 +165,14 @@ class Databaser:
     def add_topic_to_user(self, user_id, topic_id):
         self.cursor.execute('''
             INSERT INTO schedule (user_id, piece_id, send_at)
-            SELECT ?, id, NULL FROM pieces WHERE topic_id = ?
-        ''', (user_id, topic_id))
+            SELECT ?, p.id, NULL 
+            FROM pieces p
+            WHERE p.topic_id = ? 
+            AND NOT EXISTS (
+                SELECT 1 FROM schedule s
+                WHERE s.user_id = ? AND s.piece_id = p.id
+            )
+        ''', (user_id, topic_id, user_id))
         self.conn.commit()
 
     def piece_reation(self, user_id, piece_id, color):
@@ -175,6 +181,12 @@ class Databaser:
             VALUES (?, ?, ?)
         ''', (user_id, piece_id, color))
         self.conn.commit()
+
+    def get_user_pieces(self, user_id):
+        self.cursor.execute('''
+            SELECT * FROM schedule WHERE user_id = ?
+        ''', (user_id,))
+        return self.cursor.fetchall()
 
     def __del__(self):
         self.conn.close()

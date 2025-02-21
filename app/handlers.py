@@ -236,7 +236,7 @@ def study(message):
         return
     
     pieces = db.get_user_pieces(message.chat.id)
-    send_pieces(bot, message.chat.id, pieces)
+    bot.send_message(message.chat.id, f'Сейчас выбрано порций: {len(pieces)}')
 
 
 @bot.message_handler(commands=['add_topic'])
@@ -267,7 +267,7 @@ def add_topic(message, step=0):
             return
         
         db.add_topic_to_user(message.chat.id, topic_id)
-        bot.send_message(message.chat.id, 'Успешно')
+        bot.send_message(message.chat.id, 'Добавил тему')
         
 
 @bot.callback_query_handler(func=lambda call: True)

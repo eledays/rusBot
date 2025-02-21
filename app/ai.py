@@ -85,9 +85,13 @@ def get_access_token():
     }
 
     response = requests.request("POST", url, headers=headers, data=payload, verify=False)
-    json_response = json.loads(response.text)
 
-    return json_response['access_token'], json_response['expires_at']
+    if response.status_code == 200:
+        json_response = json.loads(response.text)
+
+        return json_response['access_token'], json_response['expires_at']
+    else:
+        raise Exception(f'Error getting access token: {response.status_code} - {response.text}')
 
 
 def get_response(messages: list[dict], access_token) -> str:

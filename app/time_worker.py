@@ -21,6 +21,7 @@ def job():
                 InlineKeyboardButton('🟢', callback_data=f'piece-reaction_green_{piece_id}'),
             )
             bot.send_message(user_id, data, reply_markup=keyboard)
+            db.postpone_piece(user_id, piece_id, 1)
 
 
 def run():
