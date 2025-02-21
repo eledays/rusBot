@@ -40,6 +40,13 @@ class Databaser:
                 color TEXT NOT NULL
             )
         ''')
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_settings (
+                user_id INTEGER PRIMARY KEY,
+                do_not_disturb_start TIME,
+                do_not_disturb_end TIME
+            )
+        ''')
         self.conn.commit()
 
     def add_topic(self, name, author_id, human_verified=False, admin_verified=False):
@@ -102,12 +109,19 @@ class Databaser:
         return self.cursor.fetchall()
     
     def get_piece_to_send(self, user_id):
-        # Порция по расписани
-        self.cursor.execute('''
-            SELECT * FROM schedule WHERE user_id = ? AND send_at <= DATETIME('now') ORDER BY send_at ASC LIMIT 1
-        ''', (user_id,))
+        do_not_disturb = self.get_do_not_disturb(user_id)
+        if do_not_disturb:
+            start_time, end_time = do_not_disturb
+            self.cursor.execute('''
+                SELECT * FROM schedule WHERE user_id = ? AND send_at <= DATETIME('now') 
+                AND (TIME('now') NOT BETWEEN ? AND ?) ORDER BY send_at ASC LIMIT 1
+            ''', (user_id, start_time, end_time))
+        else:
+            self.cursor.execute('''
+                SELECT * FROM schedule WHERE user_id = ? AND send_at <= DATETIME('now') ORDER BY send_at ASC LIMIT 1
+            ''', (user_id,))
+        
         scheduled = self.cursor.fetchone()
-
         if scheduled:
             self.cursor.execute('''
                 UPDATE schedule SET send_at = NULL WHERE id = ?
@@ -115,9 +129,8 @@ class Databaser:
             self.conn.commit()
             piece_id = scheduled['piece_id']
             piece = self.get_piece(piece_id)
-
             return scheduled['user_id'], piece['data'], piece_id
-        
+
         # Порция без даты  
         self.cursor.execute('''
             SELECT * FROM schedule WHERE user_id = ? AND send_at IS NULL LIMIT 1
@@ -188,7 +201,22 @@ class Databaser:
         ''', (user_id,))
         return self.cursor.fetchall()
 
+    def set_do_not_disturb(self, user_id, start_time, end_time):
+        self.cursor.execute('''
+            INSERT INTO user_settings (user_id, do_not_disturb_start, do_not_disturb_end)
+            VALUES (?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+            do_not_disturb_start = excluded.do_not_disturb_start,
+            do_not_disturb_end = excluded.do_not_disturb_end
+        ''', (user_id, start_time, end_time))
+        self.conn.commit()
+
+    def get_do_not_disturb(self, user_id):
+        self.cursor.execute('''
+            SELECT do_not_disturb_start, do_not_disturb_end FROM user_settings WHERE user_id = ?
+        ''', (user_id,))
+        return self.cursor.fetchone()
+
     def __del__(self):
         self.conn.close()
-        
-        
+

@@ -270,6 +270,28 @@ def add_topic(message, step=0):
         bot.send_message(message.chat.id, 'Добавил тему')
         
 
+@bot.message_handler(commands=['set_dnd'])
+def set_dnd(message, step=0, data={}):
+    if message.text == '/cancel':
+        bot.send_message(message.chat.id, 'Отменено')
+        return
+
+    if step == 0:
+        message = bot.send_message(message.chat.id, 'Отправь время начала в формате HH:MM')
+        bot.register_next_step_handler(message, set_dnd, 1, data)
+
+    elif step == 1:
+        start_time = message.text
+        data['start_time'] = start_time
+        message = bot.send_message(message.chat.id, 'Отправь время окончания в формате HH:MM')
+        bot.register_next_step_handler(message, set_dnd, 2, data)
+
+    elif step == 2:
+        end_time = message.text
+        db.set_do_not_disturb(message.chat.id, data['start_time'], end_time)
+        bot.send_message(message.chat.id, 'Время "не беспокоить" установлено')
+
+
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
     if call.data.startswith('yes'):

@@ -31,5 +31,5 @@ def run():
 
 
 # send_schedule = schedule.every().hour.at(':00').do(job)
-send_schedule = schedule.every(.25).minutes.at(':00').do(job)
+send_schedule = schedule.every().minutes.at(':00').do(job)
 threading.Thread(target=run).start()
