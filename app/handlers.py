@@ -210,7 +210,7 @@ def edit_topic(message, step=0, data={}):
 @bot.message_handler(commands=['topics'])
 def send_topics(message):
     topics = db.get_topics()[:50]
-    topics = [f'{e["id"] + 1}. {e["name"]}' for e in topics]
+    topics = [f'{e["id"]}. {e["name"]}' for e in topics]
     bot.send_message(message.chat.id, '<b>Темы</b>\n' + '\n'.join(topics))
 
 
@@ -231,8 +231,44 @@ def pieces_cmd(message):
 
 @bot.message_handler(commands=['study'])
 def study(message):
-    bot.send_message(message.chat.id, '')
+    if not db.has_user_pieces(message.chat.id):
+        bot.send_message(message.chat.id, 'У тебя пока нет порций. Давай выберем — <b>/add_topic</b>')
+        return
+    
+    pieces = db.get_user_pieces(message.chat.id)
+    send_pieces(bot, message.chat.id, pieces)
 
+
+@bot.message_handler(commands=['add_topic'])
+def add_topic(message, step=0):
+    if message.text == '/cancel':
+        bot.send_message(message.chat.id, 'Отменено')
+        return
+        
+    if message.text == '/topics':
+        send_topics(message)
+        return
+
+    if step == 0:
+        message = bot.send_message(message.chat.id, 'Отправь ID темы\n'
+                                                    '<b>/topics</b> — все темы')
+        bot.register_next_step_handler(message, add_topic, 1)
+
+    elif step == 1:
+        topic_id = message.text
+        if not topic_id.isdigit():
+            bot.send_message(message.chat.id, 'ID должен быть числом')
+            return
+        
+        topic_id = int(topic_id)
+        topic = db.get_topic(topic_id)
+        if not topic:
+            bot.send_message(message.chat.id, 'Такой темы не существует')
+            return
+        
+        db.add_topic_to_user(message.chat.id, topic_id)
+        bot.send_message(message.chat.id, 'Успешно')
+        
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
@@ -268,6 +304,9 @@ def callback_inline(call):
         if color == 'green':
             db.postpone_piece(piece_id, call.message.chat.id, 28)
         elif color == 'yellow':
+            db.piece_reation(call.message.chat.id, piece_id, 'yellow')
             db.postpone_piece(piece_id, call.message.chat.id, 1)
         elif color == 'red':
             db.postpone_piece(piece_id, call.message.chat.id, 0)
+            
+        db.piece_reation(call.message.chat.id, piece_id, color)

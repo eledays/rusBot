@@ -33,6 +33,13 @@ class Databaser:
                 send_at DATETIME
             )
         ''')
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS statictics (
+                user_id INTEGER NOT NULL,
+                piece_id INTEGER NOT NULL,
+                color TEXT NOT NULL,
+            )
+        ''')
         self.conn.commit()
 
     def add_topic(self, name, author_id, human_verified=False, admin_verified=False):
@@ -95,6 +102,7 @@ class Databaser:
         return self.cursor.fetchall()
     
     def get_piece_to_send(self, user_id):
+        # Порция по расписани
         self.cursor.execute('''
             SELECT * FROM schedule WHERE user_id = ? AND send_at <= DATETIME('now') ORDER BY send_at ASC LIMIT 1
         ''', (user_id,))
@@ -106,18 +114,35 @@ class Databaser:
             ''', (scheduled['id'],))
             self.conn.commit()
             piece_id = scheduled['piece_id']
+            piece = self.get_piece(piece_id)
 
             return scheduled['user_id'], piece['data'], piece_id
-        else:
-            self.cursor.execute('''
-                SELECT * FROM schedule WHERE user_id = ? AND send_at IS NULL LIMIT 1
-            ''', (user_id,))
-            scheduled = self.cursor.fetchone()
+        
+        # Порция без даты  
+        self.cursor.execute('''
+            SELECT * FROM schedule WHERE user_id = ? AND send_at IS NULL LIMIT 1
+        ''', (user_id,))
+        scheduled = self.cursor.fetchone()
 
+        if scheduled:
             piece_id = scheduled['piece_id']
             piece = self.get_piece(piece_id)
-            if piece:
-                return scheduled['user_id'], piece['data'], piece_id
+            return scheduled['user_id'], piece['data'], piece_id
+        
+        # Порция с датой из будущего
+        self.cursor.execute('''
+            SELECT * FROM schedule WHERE user_id = ? ORDER BY send_at ASC LIMIT 1
+        ''', (user_id,))
+        scheduled = self.cursor.fetchone()
+        if scheduled:
+            self.cursor.execute('''
+                UPDATE schedule SET send_at = NULL WHERE id = ?
+            ''', (scheduled['id'],))
+            self.conn.commit()
+            piece_id = scheduled['piece_id']
+            piece = self.get_piece(piece_id)
+
+            return scheduled['user_id'], piece['data'], piece_id
             
     def postpone_piece(self, piece_id, user_id, days):
         self.cursor.execute(f'''
@@ -130,6 +155,26 @@ class Databaser:
             SELECT DISTINCT user_id FROM schedule
         ''')
         return self.cursor.fetchall()
+    
+    def has_user_pieces(self, user_id):
+        self.cursor.execute('''
+            SELECT * FROM schedule WHERE user_id = ?
+        ''', (user_id,))
+        return bool(self.cursor.fetchone())
+    
+    def add_topic_to_user(self, user_id, topic_id):
+        self.cursor.execute('''
+            INSERT INTO schedule (user_id, piece_id, send_at)
+            SELECT ?, id, NULL FROM pieces WHERE topic_id = ?
+        ''', (user_id, topic_id))
+        self.conn.commit()
+
+    def piece_reation(self, user_id, piece_id, color):
+        self.cursor.execute('''
+            INSERT INTO piece_reations (user_id, piece_id, color)
+            VALUES (?, ?, ?)
+        ''', (user_id, piece_id, color))
+        self.conn.commit()
 
     def __del__(self):
         self.conn.close()
