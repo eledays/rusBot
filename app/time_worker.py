@@ -34,6 +34,6 @@ def run():
         time.sleep(1)
 
 
-# send_schedule = schedule.every().hour.at(':00').do(job)
-send_schedule = schedule.every(.25).minutes.do(job)
+send_schedule = schedule.every().hour.at(':00').do(job)
+# send_schedule = schedule.every(.25).minutes.do(job)
 threading.Thread(target=run).start()

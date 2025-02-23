@@ -43,10 +43,14 @@ def send_long_message(bot, *args, **kwargs):
     return last_msg
 
 
-def send_pieces(bot, chat_id, pieces):
+def send_pieces(bot, chat_id, pieces, topic_name=None):
     pieces = [f'{i+1}. <blockquote>{piece["data"]}</blockquote>' for i, piece in enumerate(pieces)]
 
     text = '<b>Порции</b>\n'
+    
+    if topic_name:
+        text = f'<b>Тема "{topic_name}"</b>\n'
+
     for piece in pieces:
         if len(text) + len(piece) + 2 > 4096:
             bot.send_message(chat_id, text)

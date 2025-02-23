@@ -22,6 +22,7 @@ def send_welcome(message):
 def send_help(message):
     bot.send_message(message.chat.id, '<b>Основные команды</b>\n\n'
                                       '<b>/study</b> — настройки обучения, выбор тем\n'
+                                      '<b>/add_topic</b> — добавить темы в изучение\n'
                                       '<b>/set_dnd</b> — установить режим "Не беспокоить"\n\n'
                                       '<b>Темы:</b>\n'
                                       '<b>/create</b> — создать тему\n'
@@ -33,9 +34,9 @@ def send_help(message):
 @bot.message_handler(commands=['create'])
 def create_topic(message, step=0, data={}):
     if message.text == '/cancel':
-        if data and 'topic_id' in data:
-            db.delete_topic(data['topic_id'])
-            shutil.rmtree(f'{basedir}/users_content/{data["topic_id"]}')
+        # if data and 'topic_id' in data:
+        #     db.delete_topic(data['topic_id'])
+        #     shutil.rmtree(f'{basedir}/users_content/{data["topic_id"]}')
         bot.send_message(message.chat.id, 'Отменено')
         return
 
@@ -46,69 +47,72 @@ def create_topic(message, step=0, data={}):
     elif step == 1:
         name = message.text
         topic_id = db.add_topic(name, message.from_user.id)
-    
-        os.mkdir(f'{basedir}/users_content/{topic_id}')
 
-        message = bot.send_message(message.chat.id, 'Сейчас мне нужно получить всю теорию, которую ты хочешь выучить. Для этого ты можешь присылать её текстом или попросить помощи у нейросети — <b>/ai</b>')
-        bot.register_next_step_handler(message, create_topic, 2, {'topic_id': topic_id, 'name': name})
+        message = bot.send_message(message.chat.id, '<b>Редактирование</b>\n\n'
+                                                    '<b>/add_piece</b> — добавить порцию\n'
+                                                    '<b>/show_pieces</b> — показать текущие порции\n\n'
+                                                    '<b>/edit_piece n</b> — изменить порцию номер n\n'
+                                                    '<b>/delete_piece n</b> — удалить порцию номер n\n'
+                                                    '<b>/finish</b> — завершить редактирование')
+        bot.register_next_step_handler(message, edit_topic, 'piece_editing_cmd', {'topic_id': topic_id, 'name': name})
 
-    elif step == 2:
-        if message.text == '/ai':
-            if os.path.exists(f'{basedir}/users_content/{data["topic_id"]}/theory.txt'):
-                bot.send_message(message.chat.id, 'Применить ИИ можно только при создании темы')
-                bot.register_next_step_handler(message, create_topic, 2, data)
-                return
-            print(data)
-            create_topic(message, 'ai-gen-text', data)
-        elif message.text == '/next':
-            bot.send_message(message.chat.id, 'Отлично. Сейчас нейросеть разобьет теорию на маленькие порции информации')
-            with open(f'{basedir}/users_content/{data["topic_id"]}/theory.txt', 'r') as file:
-                text = file.read()
-            pieces = ai.text_to_pieces(text)
+    # elif step == 2:
+    #     if message.text == '/ai':
+    #         if os.path.exists(f'{basedir}/users_content/{data["topic_id"]}/theory.txt'):
+    #             bot.send_message(message.chat.id, 'Применить ИИ можно только при создании темы')
+    #             bot.register_next_step_handler(message, create_topic, 2, data)
+    #             return
+    #         print(data)
+    #         create_topic(message, 'ai-gen-text', data)
+    #     elif message.text == '/next':
+    #         bot.send_message(message.chat.id, 'Отлично. Сейчас нейросеть разобьет теорию на маленькие порции информации')
+    #         with open(f'{basedir}/users_content/{data["topic_id"]}/theory.txt', 'r') as file:
+    #             text = file.read()
+    #         pieces = ai.text_to_pieces(text)
 
-            text = '\n\n'.join(f'<blockquote>{e}</blockquote>' for e in pieces)
+    #         text = '\n\n'.join(f'<blockquote>{e}</blockquote>' for e in pieces)
 
-            message = send_long_message(bot, message.chat.id, text + '\n\n<b>/save</b> — сохранить порции\n'
-                                                                     '<b>/edit</b> — редактировать')
+    #         message = send_long_message(bot, message.chat.id, text + '\n\n<b>/save</b> — сохранить порции\n'
+    #                                                                  '<b>/edit</b> — редактировать')
 
-            data['pieces'] = pieces
-            db.add_pieces(data['topic_id'], data['pieces'])
+    #         data['pieces'] = pieces
+    #         db.add_pieces(data['topic_id'], data['pieces'])
 
-            bot.register_next_step_handler(message, create_topic, 3, data)
-        else:
-            text = message.text
-            with open(f'{basedir}/users_content/{data["topic_id"]}/theory.txt', 'a') as file:
-                file.write(text + '\n\n')
-            message = bot.send_message(message.chat.id, 'Записал. Можешь прислать ещё или переходить к следующему шагу — <b>/next</b>')
-            bot.register_next_step_handler(message, create_topic, 2, data)
+    #         bot.register_next_step_handler(message, create_topic, 3, data)
+    #     else:
+    #         text = message.text
+    #         with open(f'{basedir}/users_content/{data["topic_id"]}/theory.txt', 'a') as file:
+    #             file.write(text + '\n\n')
+    #         message = bot.send_message(message.chat.id, 'Записал. Можешь прислать ещё или переходить к следующему шагу — <b>/next</b>')
+    #         bot.register_next_step_handler(message, create_topic, 2, data)
 
-    elif step == 3:
-        if message.text == '/save':
-            bot.send_message(message.chat.id, 'Сохранил')
-        elif message.text == '/edit':
-            bot.send_message(message.chat.id, '<b>Редактирование</b>\n\n'
-                                                '<b>/edit_piece n</b> — изменить порцию номер n\n'
-                                                '<b>/delete_piece n</b> — удалить порцию номер n\n'
-                                                '<b>/add_piece</b> — добавить порцию\n'
-                                                '<b>/show_pieces</b> — показать текущие порции\n\n'
-                                                '<b>/finish</b> — завершить редактирование')
-            bot.register_next_step_handler(message, edit_topic, 'piece_editing_cmd', data)
+    # elif step == 3:
+    #     if message.text == '/save':
+    #         bot.send_message(message.chat.id, 'Сохранил')
+    #     elif message.text == '/edit':
+    #         bot.send_message(message.chat.id, '<b>Редактирование</b>\n\n'
+    #                                             '<b>/edit_piece n</b> — изменить порцию номер n\n'
+    #                                             '<b>/delete_piece n</b> — удалить порцию номер n\n'
+    #                                             '<b>/add_piece</b> — добавить порцию\n'
+    #                                             '<b>/show_pieces</b> — показать текущие порции\n\n'
+    #                                             '<b>/finish</b> — завершить редактирование')
+    #         bot.register_next_step_handler(message, edit_topic, 'piece_editing_cmd', data)
 
-    elif step == 'ai-gen-text':
-        name = data['name']
-        topic_id = data['topic_id']
-        prompt = f'Напиши всю теорию по теме "{name}". Не обращайся к пользователю, пиши только то, что относится к теме, не используй вводный текст. Не используй markdown'
-        message = bot.send_message(message.chat.id, 'Секундочку...')
-        answer = ai.ask(prompt)
-        bot.delete_message(message.chat.id, message.id)
+    # elif step == 'ai-gen-text':
+    #     name = data['name']
+    #     topic_id = data['topic_id']
+    #     prompt = f'Напиши всю теорию по теме "{name}". Не обращайся к пользователю, пиши только то, что относится к теме, не используй вводный текст. Не используй markdown'
+    #     message = bot.send_message(message.chat.id, 'Секундочку...')
+    #     answer = ai.ask(prompt)
+    #     bot.delete_message(message.chat.id, message.id)
 
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=3)
-        keyboard.add(
-            telebot.types.InlineKeyboardButton(text='✔️', callback_data=f'yes_{topic_id}'), 
-            telebot.types.InlineKeyboardButton(text='✖️', callback_data=f'no_{topic_id}'),
-            telebot.types.InlineKeyboardButton(text='🔄', callback_data=f'refresh_{topic_id}')
-        )
-        send_long_message(bot, message.chat.id, answer, reply_markup=keyboard, parse_mode='markdown')
+    #     keyboard = telebot.types.InlineKeyboardMarkup(row_width=3)
+    #     keyboard.add(
+    #         telebot.types.InlineKeyboardButton(text='✔️', callback_data=f'yes_{topic_id}'), 
+    #         telebot.types.InlineKeyboardButton(text='✖️', callback_data=f'no_{topic_id}'),
+    #         telebot.types.InlineKeyboardButton(text='🔄', callback_data=f'refresh_{topic_id}')
+    #     )
+    #     send_long_message(bot, message.chat.id, answer, reply_markup=keyboard, parse_mode='markdown')
 
 
 @bot.message_handler(commands=['edit'])
@@ -140,10 +144,10 @@ def edit_topic(message, step=0, data={}):
         data['topic_id'] = topic_id
         data['pieces'] = [e['data'] for e in pieces]
         bot.send_message(message.chat.id, '<b>Редактирование</b>\n\n'
-                                            '<b>/edit_piece n</b> — изменить порцию номер n\n'
-                                            '<b>/delete_piece n</b> — удалить порцию номер n\n'
                                             '<b>/add_piece</b> — добавить порцию\n'
-                                            '<b>/show_pieces</b> — показать текущие порции\n\n'
+                                            '<b>/show_pieces</b> — показать текущие порции\n'
+                                            '<b>/edit_piece n</b> — изменить порцию номер n\n'
+                                            '<b>/delete_piece n</b> — удалить порцию номер n\n\n'
                                             '<b>/finish</b> — завершить редактирование')
         
         bot.register_next_step_handler(message, edit_topic, 'piece_editing_cmd', data)
@@ -188,7 +192,9 @@ def edit_topic(message, step=0, data={}):
         
         elif message.text.startswith('/show_pieces'):
             pieces = data['pieces']
-            text = '\n\n'.join(f'<b>{i+1}.</b> <blockquote>{piece}</blockquote>' for i, piece in enumerate(pieces))
+            text = 'Пока нет ни одной порции'
+            if pieces:
+                text = '\n\n'.join(f'<b>{i+1}.</b> <blockquote>{piece}</blockquote>' for i, piece in enumerate(pieces))
             message = send_long_message(bot, message.chat.id, text)
             bot.register_next_step_handler(message, edit_topic, 'piece_editing_cmd', data)
         
@@ -196,6 +202,32 @@ def edit_topic(message, step=0, data={}):
             db.update_pieces(data['topic_id'], data['pieces'])
             bot.send_message(message.chat.id, 'Редактирование завершено')
             return
+        
+        elif message.text == '/help':
+            bot.send_message(message.chat.id, '<b>/add_piece</b> — добавить порцию\n'
+                                              '<b>/show_pieces</b> — показать текущие порции\n'
+                                              '<b>/edit_piece n</b> — изменить порцию номер n\n'
+                                              '<b>/delete_piece n</b> — удалить порцию номер n\n\n'
+                                              '<b>/finish</b> — завершить редактирование')
+        
+        elif message.text.startswith('/'):
+            bot.send_message(message.chat.id, 'Такой команды не существует\n\n'
+                                              'Доступные:\n'
+                                              '<b>/add_piece</b> — добавить порцию\n'
+                                              '<b>/show_pieces</b> — показать текущие порции\n'
+                                              '<b>/edit_piece n</b> — изменить порцию номер n\n'
+                                              '<b>/delete_piece n</b> — удалить порцию номер n\n\n'
+                                              '<b>/finish</b> — завершить редактирование')
+            bot.register_next_step_handler(message, edit_topic, 'piece_editing_cmd', data)
+
+        else:
+            new_piece = message.text
+            if 'pieces' in data:
+                data['pieces'].append(new_piece)
+            else:
+                data['pieces'] = [new_piece]
+            bot.send_message(message.chat.id, 'Новая порция добавлена')
+            bot.register_next_step_handler(message, edit_topic, 'piece_editing_cmd', data)
 
     elif step == 'piece_editing_edit':
         n = data['n']
@@ -206,7 +238,10 @@ def edit_topic(message, step=0, data={}):
 
     elif step == 'piece_editing_add':
         new_piece = message.text
-        data['pieces'].append(new_piece)
+        if 'pieces' in data:
+            data['pieces'].append(new_piece)
+        else:
+            data['pieces'] = [new_piece]
         bot.send_message(message.chat.id, 'Новая порция добавлена')
         bot.register_next_step_handler(message, edit_topic, 'piece_editing_cmd', data)
 
@@ -230,7 +265,7 @@ def pieces_cmd(message):
         bot.send_message(message.chat.id, 'По вашему запросу ничего не найдено')
         return 
     
-    send_pieces(bot, message.chat.id, pieces)
+    send_pieces(bot, message.chat.id, pieces, db.get_topic_name_by_id(int(topic_id)))
 
 
 @bot.message_handler(commands=['study'])
