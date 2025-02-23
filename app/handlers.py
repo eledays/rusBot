@@ -5,6 +5,7 @@ import telebot
 
 import os
 import shutil
+from datetime import datetime
 
 
 @bot.message_handler(commands=['start'])
@@ -20,10 +21,11 @@ def send_welcome(message):
 @bot.message_handler(commands=['help'])
 def send_help(message):
     bot.send_message(message.chat.id, '<b>Основные команды</b>\n\n'
-                                      '<b>/study</b> — настройки обучения, выбор тем\n\n'
+                                      '<b>/study</b> — настройки обучения, выбор тем\n'
+                                      '<b>/set_dnd</b> — установить режим "Не беспокоить"\n\n'
                                       '<b>Темы:</b>\n'
                                       '<b>/create</b> — создать тему\n'
-                                      '<b>/topics</b> — список существующих тем'
+                                      '<b>/topics</b> — список существующих тем\n'
                                       '<b>/edit</b> — редактировать тему\n'
                                       '<b>/pieces n</b> — порции теории темы n\n')
     
@@ -147,7 +149,7 @@ def edit_topic(message, step=0, data={}):
         bot.register_next_step_handler(message, edit_topic, 'piece_editing_cmd', data)
 
     elif step == 'piece_editing_cmd':
-        if message.text.startswith('/edit_piece'):
+        if message.text.startswith('/edit_piece') or 'ep' in message.text:
             n = message.text.split()[-1]
             if not n.isdigit():
                 bot.send_message(message.chat.id, 'Номер должен быть числом')
@@ -159,8 +161,10 @@ def edit_topic(message, step=0, data={}):
                 bot.send_message(message.chat.id, 'Номер порции вне диапазона')
                 return
             
+            data['n'] = n
+
             message = bot.send_message(message.chat.id, 'Отправь новую порцию')
-            bot.register_next_step_handler(message, edit_topic, 'piece_editing_edit', {'n': n, **data})
+            bot.register_next_step_handler(message, edit_topic, 'piece_editing_edit', data)
         
         elif message.text.startswith('/delete_piece'):
             n = message.text.split()[-1]
@@ -189,7 +193,7 @@ def edit_topic(message, step=0, data={}):
             bot.register_next_step_handler(message, edit_topic, 'piece_editing_cmd', data)
         
         elif message.text.startswith('/finish'):
-            db.add_pieces(data['topic_id'], data['pieces'])
+            db.update_pieces(data['topic_id'], data['pieces'])
             bot.send_message(message.chat.id, 'Редактирование завершено')
             return
 
@@ -281,14 +285,34 @@ def set_dnd(message, step=0, data={}):
         bot.register_next_step_handler(message, set_dnd, 1, data)
 
     elif step == 1:
-        start_time = message.text
-        data['start_time'] = start_time
+        start_time_str = message.text
+
+        try:
+            datetime.strptime(start_time_str, '%H:%M')
+        except:
+            bot.send_message(message.chat.id, 'Неверный формат, отменено')
+            return
+
+        data['start_time'] = start_time_str
         message = bot.send_message(message.chat.id, 'Отправь время окончания в формате HH:MM')
         bot.register_next_step_handler(message, set_dnd, 2, data)
 
     elif step == 2:
-        end_time = message.text
-        db.set_do_not_disturb(message.chat.id, data['start_time'], end_time)
+        end_time_str = message.text
+
+        try:
+            start_time = datetime.strptime(data['start_time'], '%H:%M').time()
+            end_time = datetime.strptime(end_time_str, '%H:%M').time()
+        except:
+            bot.send_message(message.chat.id, 'Неверный формат, отменено')
+            return
+        
+        if end_time > start_time:
+            db.set_do_not_disturb(message.chat.id, data['start_time'], end_time_str)
+        else:
+            db.set_do_not_disturb(message.chat.id, data['start_time'], '23:59')
+            db.set_do_not_disturb(message.chat.id, '00:00', end_time_str)
+
         bot.send_message(message.chat.id, 'Время "не беспокоить" установлено')
 
 

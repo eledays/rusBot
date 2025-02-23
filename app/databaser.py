@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import datetime
 
 
 class Databaser:
@@ -7,47 +8,6 @@ class Databaser:
         self.conn = sqlite3.connect(filename, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.cursor = self.conn.cursor()
-
-    def create(self):
-        self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS topics (
-                id INTEGER PRIMARY KEY,
-                name TEXT NOT NULL,
-                author_id INTEGER NOT NULL,
-                human_verified BOOLEAN DEFAULT FALSE,
-                admin_verified BOOLEAN DEFAULT FALSE
-            )
-        ''')
-        self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS pieces (
-                id INTEGER PRIMARY KEY,
-                topic_id INTEGER NOT NULL,
-                data TEXT NOT NULL
-            )
-        ''')
-        self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS schedule (
-                id INTEGER PRIMARY KEY,
-                user_id INTEGER NOT NULL,
-                piece_id INTEGER NOT NULL,
-                send_at DATETIME
-            )
-        ''')
-        self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS statictics (
-                user_id INTEGER NOT NULL,
-                piece_id INTEGER NOT NULL,
-                color TEXT NOT NULL
-            )
-        ''')
-        self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS user_settings (
-                user_id INTEGER PRIMARY KEY,
-                do_not_disturb_start TIME,
-                do_not_disturb_end TIME
-            )
-        ''')
-        self.conn.commit()
 
     def add_topic(self, name, author_id, human_verified=False, admin_verified=False):
         self.cursor.execute('''
@@ -96,6 +56,13 @@ class Databaser:
         ''', [(topic_id, e) for e in pieces])
         self.conn.commit()
 
+    def update_pieces(self, topic_id, pieces):
+        self.cursor.execute('''
+            DELETE FROM pieces WHERE topic_id = ?
+        ''', (topic_id,))
+        self.add_pieces(topic_id, pieces)
+        self.conn.commit()
+
     def get_piece(self, piece_id):
         self.cursor.execute('''
             SELECT * FROM pieces WHERE id = ?
@@ -109,17 +76,9 @@ class Databaser:
         return self.cursor.fetchall()
     
     def get_piece_to_send(self, user_id):
-        do_not_disturb = self.get_do_not_disturb(user_id)
-        if do_not_disturb:
-            start_time, end_time = do_not_disturb
-            self.cursor.execute('''
-                SELECT * FROM schedule WHERE user_id = ? AND send_at <= DATETIME('now') 
-                AND (TIME('now') NOT BETWEEN ? AND ?) ORDER BY send_at ASC LIMIT 1
-            ''', (user_id, start_time, end_time))
-        else:
-            self.cursor.execute('''
-                SELECT * FROM schedule WHERE user_id = ? AND send_at <= DATETIME('now') ORDER BY send_at ASC LIMIT 1
-            ''', (user_id,))
+        self.cursor.execute('''
+            SELECT * FROM schedule WHERE user_id = ? AND send_at <= DATETIME('now') ORDER BY send_at ASC LIMIT 1
+        ''', (user_id,))
         
         scheduled = self.cursor.fetchone()
         if scheduled:
@@ -158,9 +117,10 @@ class Databaser:
             return scheduled['user_id'], piece['data'], piece_id
             
     def postpone_piece(self, piece_id, user_id, days):
-        self.cursor.execute(f'''
-            UPDATE schedule SET send_at = DATETIME('now', '+{days} day') WHERE piece_id = ? AND user_id = ?
-        ''', (piece_id, user_id))
+        query = f'''
+            UPDATE schedule SET send_at = DATETIME('now', '+{days} day') WHERE piece_id = {piece_id} AND user_id = {user_id}
+        '''
+        self.cursor.execute(query)
         self.conn.commit()
 
     def get_users(self):
@@ -190,7 +150,7 @@ class Databaser:
 
     def piece_reation(self, user_id, piece_id, color):
         self.cursor.execute('''
-            INSERT INTO piece_reations (user_id, piece_id, color)
+            INSERT INTO statictics (user_id, piece_id, color)
             VALUES (?, ?, ?)
         ''', (user_id, piece_id, color))
         self.conn.commit()
@@ -202,12 +162,20 @@ class Databaser:
         return self.cursor.fetchall()
 
     def set_do_not_disturb(self, user_id, start_time, end_time):
+        try:
+            datetime.strptime(start_time, '%H:%M').time()
+            datetime.strptime(end_time, '%H:%M').time()
+        except:
+            return
+
+        self.cursor.execute('''
+            DELETE FROM user_settings WHERE user_id = ?
+        ''', (user_id,))
+        self.conn.commit()
+        
         self.cursor.execute('''
             INSERT INTO user_settings (user_id, do_not_disturb_start, do_not_disturb_end)
             VALUES (?, ?, ?)
-            ON CONFLICT(user_id) DO UPDATE SET
-            do_not_disturb_start = excluded.do_not_disturb_start,
-            do_not_disturb_end = excluded.do_not_disturb_end
         ''', (user_id, start_time, end_time))
         self.conn.commit()
 
@@ -215,7 +183,23 @@ class Databaser:
         self.cursor.execute('''
             SELECT do_not_disturb_start, do_not_disturb_end FROM user_settings WHERE user_id = ?
         ''', (user_id,))
-        return self.cursor.fetchone()
+        dnd = self.cursor.fetchone()
+
+        if dnd is None:
+            return
+
+        start_time, end_time = dnd
+        start_time = datetime.strptime(start_time, '%H:%M').time()
+        end_time = datetime.strptime(end_time, '%H:%M').time()
+
+        return start_time, end_time
+    
+    def can_send(self, user_id):
+        do_not_disturb = self.get_do_not_disturb(user_id)
+        if do_not_disturb:
+            start_time, end_time = do_not_disturb
+            return not (start_time <= datetime.now().time() <= end_time)
+        return True
 
     def __del__(self):
         self.conn.close()
