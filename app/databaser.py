@@ -88,6 +88,11 @@ class Databaser:
             self.conn.commit()
             piece_id = scheduled['piece_id']
             piece = self.get_piece(piece_id)
+
+            if piece is None:
+                self.delete_non_exsitent_tasks_from_schedule()
+                return None
+            
             return scheduled['user_id'], piece['data'], piece_id
 
         # Порция без даты  
@@ -99,6 +104,11 @@ class Databaser:
         if scheduled:
             piece_id = scheduled['piece_id']
             piece = self.get_piece(piece_id)
+
+            if piece is None:
+                self.delete_non_exsitent_tasks_from_schedule()
+                return None
+
             return scheduled['user_id'], piece['data'], piece_id
         
         # Порция с датой из будущего
@@ -113,6 +123,10 @@ class Databaser:
             self.conn.commit()
             piece_id = scheduled['piece_id']
             piece = self.get_piece(piece_id)
+
+            if piece is None:
+                self.delete_non_exsitent_tasks_from_schedule()
+                return None
 
             return scheduled['user_id'], piece['data'], piece_id
             
@@ -200,6 +214,12 @@ class Databaser:
             start_time, end_time = do_not_disturb
             return not (start_time <= datetime.now().time() <= end_time)
         return True
+    
+    def delete_non_exsitent_tasks_from_schedule(self):
+        self.cursor.execute('''
+            DELETE FROM schedule WHERE piece_id NOT IN (SELECT id FROM pieces)
+        ''')
+        self.conn.commit()
 
     def __del__(self):
         self.conn.close()
