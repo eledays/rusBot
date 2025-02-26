@@ -385,9 +385,8 @@ def callback_inline(call):
         if color == 'green':
             db.postpone_piece(piece_id, call.message.chat.id, 28)
         elif color == 'yellow':
-            db.piece_reation(call.message.chat.id, piece_id, 'yellow')
-            db.postpone_piece(piece_id, call.message.chat.id, 1)
+            db.postpone_piece(piece_id, call.message.chat.id, 7)
         elif color == 'red':
-            db.postpone_piece(piece_id, call.message.chat.id, 0)
+            db.postpone_piece(piece_id, call.message.chat.id, 1)
             
         db.piece_reation(call.message.chat.id, piece_id, color)
